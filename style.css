@@ -1,0 +1,17 @@
+td {
+    height: 150px;
+    width: 150px;
+    text-align: center;
+    border: 10px solid black;
+    font-size: 90px;
+}
+
+#result {
+    text-align: center;
+    /* color: green; */
+    padding-top: 25px;
+}
+
+table {
+    margin: auto
+}
