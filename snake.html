@@ -12,13 +12,11 @@ body {
     text-align: center;
 }
 
-h1 {
-    margin-top: 20px;
-}
+h1 { margin-top: 20px; }
 
-#score {
+#score, #highScore {
     font-size: 18px;
-    margin: 10px;
+    margin: 5px;
 }
 
 canvas {
@@ -28,10 +26,11 @@ canvas {
     border: 3px solid #555;
 }
 
-button {
-    padding: 10px 20px;
-    font-size: 16px;
-    margin-top: 10px;
+button, select {
+    padding: 8px 15px;
+    font-size: 14px;
+    margin: 5px;
+    cursor: pointer;
 }
 </style>
 </head>
@@ -39,7 +38,16 @@ button {
 <body>
 
 <h1>🐍 Snake Game</h1>
+
 <div id="score">Score: 0</div>
+<div id="highScore">High Score: 0</div>
+
+<select id="speedSelect">
+    <option value="150">Slow</option>
+    <option value="100" selected>Normal</option>
+    <option value="60">Fast</option>
+</select>
+
 <button onclick="restart()">Restart</button>
 
 <canvas id="game" width="400" height="400"></canvas>
@@ -48,34 +56,54 @@ button {
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 const scoreDisplay = document.getElementById("score");
+const highScoreDisplay = document.getElementById("highScore");
+const speedSelect = document.getElementById("speedSelect");
 
 const gridSize = 20;
 const tileCount = canvas.width / gridSize;
 
-let snake = [];
-let direction = { x: 0, y: 0 };
-let food = {};
-let score = 0;
+let snake, direction, nextDirection, food;
+let score, highScore;
+let gameInterval;
 let gameRunning = true;
 
 function init() {
     snake = [{ x: 10, y: 10 }];
     direction = { x: 0, y: 0 };
+    nextDirection = { x: 0, y: 0 };
     score = 0;
     gameRunning = true;
+
+    highScore = localStorage.getItem("snakeHighScore") || 0;
+
     spawnFood();
     updateScore();
+    updateHighScore();
+
+    if (gameInterval) clearInterval(gameInterval);
+    gameInterval = setInterval(gameLoop, speedSelect.value);
 }
 
 function spawnFood() {
-    food = {
-        x: Math.floor(Math.random() * tileCount),
-        y: Math.floor(Math.random() * tileCount)
-    };
+    while (true) {
+        const newFood = {
+            x: Math.floor(Math.random() * tileCount),
+            y: Math.floor(Math.random() * tileCount)
+        };
+
+        if (!snake.some(s => s.x === newFood.x && s.y === newFood.y)) {
+            food = newFood;
+            break;
+        }
+    }
 }
 
 function update() {
     if (!gameRunning) return;
+
+    direction = nextDirection;
+
+    if (direction.x === 0 && direction.y === 0) return;
 
     const head = {
         x: snake[0].x + direction.x,
@@ -92,16 +120,13 @@ function update() {
     }
 
     // Self collision
-    for (let segment of snake) {
-        if (head.x === segment.x && head.y === segment.y) {
-            gameOver();
-            return;
-        }
+    if (snake.some(s => s.x === head.x && s.y === head.y)) {
+        gameOver();
+        return;
     }
 
     snake.unshift(head);
 
-    // Food collision
     if (head.x === food.x && head.y === food.y) {
         score++;
         spawnFood();
@@ -115,7 +140,7 @@ function draw() {
     ctx.fillStyle = "#222";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Draw snake
+    // Snake
     ctx.fillStyle = "#00ff88";
     snake.forEach(segment => {
         ctx.fillRect(
@@ -126,7 +151,7 @@ function draw() {
         );
     });
 
-    // Draw food
+    // Food
     ctx.fillStyle = "#ff4444";
     ctx.fillRect(
         food.x * gridSize,
@@ -139,11 +164,18 @@ function draw() {
 function gameLoop() {
     update();
     draw();
-    setTimeout(gameLoop, 100); // speed (lower = faster)
 }
 
 function gameOver() {
     gameRunning = false;
+    clearInterval(gameInterval);
+
+    if (score > highScore) {
+        highScore = score;
+        localStorage.setItem("snakeHighScore", highScore);
+        updateHighScore();
+    }
+
     alert("Game Over! Final Score: " + score);
 }
 
@@ -151,18 +183,30 @@ function updateScore() {
     scoreDisplay.innerText = "Score: " + score;
 }
 
+function updateHighScore() {
+    highScoreDisplay.innerText = "High Score: " + highScore;
+}
+
 document.addEventListener("keydown", e => {
-    if (e.key === "ArrowUp" || e.key === "w") {
-        if (direction.y !== 1) direction = { x: 0, y: -1 };
-    }
-    if (e.key === "ArrowDown" || e.key === "s") {
-        if (direction.y !== -1) direction = { x: 0, y: 1 };
-    }
-    if (e.key === "ArrowLeft" || e.key === "a") {
-        if (direction.x !== 1) direction = { x: -1, y: 0 };
-    }
-    if (e.key === "ArrowRight" || e.key === "d") {
-        if (direction.x !== -1) direction = { x: 1, y: 0 };
+    if (!gameRunning) return;
+
+    if ((e.key === "ArrowUp" || e.key === "w") && direction.y !== 1)
+        nextDirection = { x: 0, y: -1 };
+
+    if ((e.key === "ArrowDown" || e.key === "s") && direction.y !== -1)
+        nextDirection = { x: 0, y: 1 };
+
+    if ((e.key === "ArrowLeft" || e.key === "a") && direction.x !== 1)
+        nextDirection = { x: -1, y: 0 };
+
+    if ((e.key === "ArrowRight" || e.key === "d") && direction.x !== -1)
+        nextDirection = { x: 1, y: 0 };
+});
+
+speedSelect.addEventListener("change", () => {
+    if (gameRunning) {
+        clearInterval(gameInterval);
+        gameInterval = setInterval(gameLoop, speedSelect.value);
     }
 });
 
@@ -171,7 +215,6 @@ function restart() {
 }
 
 init();
-gameLoop();
 </script>
 
 </body>

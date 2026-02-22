@@ -11,10 +11,6 @@ body {
     background: #f4f4f4;
 }
 
-h1 {
-    margin-top: 20px;
-}
-
 #board {
     display: grid;
     grid-template-columns: repeat(3, 100px);
@@ -49,6 +45,11 @@ button, select {
     font-size: 1.2rem;
     margin-top: 10px;
 }
+
+#scoreboard {
+    margin-top: 15px;
+    font-size: 1.1rem;
+}
 </style>
 </head>
 
@@ -62,7 +63,14 @@ button, select {
     <option value="hard">Hard</option>
 </select>
 
-<button onclick="restart()">Restart</button>
+<button onclick="restart()">New Round</button>
+<button onclick="resetScore()">Reset Score</button>
+
+<div id="scoreboard">
+    Player: <span id="playerScore">0</span> |
+    Computer: <span id="computerScore">0</span> |
+    Draws: <span id="drawScore">0</span>
+</div>
 
 <div id="board"></div>
 <div id="status"></div>
@@ -74,6 +82,15 @@ const difficultySelect = document.getElementById("difficulty");
 
 let board = ["","","","","","","","",""];
 let gameOver = false;
+
+// Score tracking
+let playerScore = 0;
+let computerScore = 0;
+let drawScore = 0;
+
+// Alternating turns
+let startingPlayer = "X"; // X = Player, O = Computer
+let currentTurn = "X";
 
 function createBoard() {
     boardElement.innerHTML = "";
@@ -87,17 +104,22 @@ function createBoard() {
 }
 
 function playerMove(index) {
-    if (board[index] !== "" || gameOver) return;
+    if (board[index] !== "" || gameOver || currentTurn !== "X") return;
 
     board[index] = "X";
+    currentTurn = "O";
     updateBoard();
 
     if (checkWinner(board, "X")) {
+        playerScore++;
+        updateScore();
         endGame("You win!");
         return;
     }
 
     if (isDraw()) {
+        drawScore++;
+        updateScore();
         endGame("Draw!");
         return;
     }
@@ -106,28 +128,37 @@ function playerMove(index) {
 }
 
 function computerMove() {
+    if (gameOver || currentTurn !== "O") return;
+
     let move;
     const difficulty = difficultySelect.value;
 
-    if (difficulty === "easy") {
-        move = randomMove();
-    } else if (difficulty === "medium") {
-        move = mediumMove();
-    } else {
-        move = minimaxMove();
-    }
+    if (difficulty === "easy") move = randomMove();
+    else if (difficulty === "medium") move = mediumMove();
+    else move = minimaxMove();
 
     board[move] = "O";
+    currentTurn = "X";
     updateBoard();
 
     if (checkWinner(board, "O")) {
+        computerScore++;
+        updateScore();
         endGame("Computer wins!");
         return;
     }
 
     if (isDraw()) {
+        drawScore++;
+        updateScore();
         endGame("Draw!");
     }
+}
+
+function updateScore() {
+    document.getElementById("playerScore").innerText = playerScore;
+    document.getElementById("computerScore").innerText = computerScore;
+    document.getElementById("drawScore").innerText = drawScore;
 }
 
 function randomMove() {
@@ -136,7 +167,7 @@ function randomMove() {
 }
 
 function mediumMove() {
-    // Try winning
+    // Win if possible
     for (let i=0;i<9;i++){
         if(board[i]===""){
             board[i]="O";
@@ -144,6 +175,7 @@ function mediumMove() {
             board[i]="";
         }
     }
+
     // Block player
     for (let i=0;i<9;i++){
         if(board[i]===""){
@@ -155,6 +187,7 @@ function mediumMove() {
             board[i]="";
         }
     }
+
     return randomMove();
 }
 
@@ -179,7 +212,7 @@ function minimaxMove() {
 function minimax(board, depth, isMaximizing) {
     if (checkWinner(board, "O")) return 10 - depth;
     if (checkWinner(board, "X")) return depth - 10;
-    if (isDraw()) return 0;
+    if (board.every(cell => cell !== "")) return 0;
 
     if (isMaximizing) {
         let best = -Infinity;
@@ -210,9 +243,7 @@ function checkWinner(b, player) {
         [0,3,6],[1,4,7],[2,5,8],
         [0,4,8],[2,4,6]
     ];
-    return wins.some(comb => 
-        comb.every(index => b[index] === player)
-    );
+    return wins.some(comb => comb.every(index => b[index] === player));
 }
 
 function isDraw() {
@@ -226,13 +257,31 @@ function updateBoard() {
 function endGame(message) {
     gameOver = true;
     statusText.innerText = message;
+
+    // Alternate starter next round
+    startingPlayer = startingPlayer === "X" ? "O" : "X";
 }
 
 function restart() {
     board = ["","","","","","","","",""];
     gameOver = false;
     statusText.innerText = "";
+
+    currentTurn = startingPlayer;
     createBoard();
+
+    // If computer starts
+    if (startingPlayer === "O") {
+        setTimeout(computerMove, 300);
+    }
+}
+
+function resetScore() {
+    playerScore = 0;
+    computerScore = 0;
+    drawScore = 0;
+    updateScore();
+    restart();
 }
 
 createBoard();
