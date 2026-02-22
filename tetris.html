@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Tetris - Game Over Menu</title>
+    <style>
+        body { background: #111; color: white; font-family: 'Segoe UI', Arial, sans-serif; display: flex; flex-direction: column; align-items: center; margin: 0; padding: 20px; }
+        h1 { color: #00f0f0; margin: 0 0 10px 0; }
+        
+        #game-layout { display: flex; gap: 20px; align-items: flex-start; }
+        #main-column { position: relative; }
+        #side-bar { display: flex; flex-direction: column; gap: 15px; }
+
+        canvas#game { background: #1a1a1a; border: 4px solid #333; border-radius: 4px; }
+        
+        .panel { background: #222; padding: 12px; border: 2px solid #444; border-radius: 8px; text-align: center; min-width: 100px; }
+        .label { font-size: 12px; color: #aaa; margin-bottom: 5px; text-transform: uppercase; }
+        .value { font-size: 20px; font-weight: bold; }
+        #high-score-val { color: #f1c40f; }
+
+        #pause-btn, .menu-btn {
+            background: #3498db; color: white; border: none; padding: 10px;
+            font-size: 16px; font-weight: bold; border-radius: 5px; cursor: pointer;
+            transition: background 0.2s;
+        }
+        #pause-btn:hover, .menu-btn:hover { background: #2980b9; }
+
+        /* Overlay Styles */
+        .overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85); display: none;
+            flex-direction: column; justify-content: center; align-items: center;
+            border-radius: 4px; z-index: 10;
+        }
+        .overlay h2 { color: #e74c3c; margin: 0 0 20px 0; font-size: 28px; }
+    </style>
+</head>
+<body>
+
+<h1>🎮 Tetris</h1>
+
+<div id="game-layout">
+    <div id="main-column">
+        <canvas id="game" width="200" height="400"></canvas>
+        
+        <div id="game-over-overlay" class="overlay">
+            <h2>GAME OVER</h2>
+            <button class="menu-btn" onclick="resetGame()">START NEW GAME</button>
+        </div>
+
+        <div id="pause-overlay" class="overlay">
+            <h2 style="color: white;">PAUSED</h2>
+            <button class="menu-btn" onclick="togglePause()">RESUME</button>
+        </div>
+    </div>
+
+    <div id="side-bar">
+        <div class="panel">
+            <div class="label">Next</div>
+            <canvas id="next" width="80" height="80"></canvas>
+        </div>
+        <div class="panel">
+            <div class="label">Score</div>
+            <div id="score" class="value">0</div>
+        </div>
+        <div class="panel">
+            <div class="label">Best</div>
+            <div id="high-score-val" class="value">0</div>
+        </div>
+        <button id="pause-btn" onclick="togglePause()">PAUSE</button>
+    </div>
+</div>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+const nextCanvas = document.getElementById("next");
+const nextCtx = nextCanvas.getContext("2d");
+
+const ROWS = 20, COLS = 10, BLOCK = 20;
+const colors = [null, '#00f0f0', '#0000f0', '#f0a000', '#f0f000', '#00f000', '#a000f0', '#f00000'];
+const pieces = [
+    { shape: [[1,1,1,1]], color: 1 }, { shape: [[2,0,0],[2,2,2]], color: 2 },
+    { shape: [[0,0,3],[3,3,3]], color: 3 }, { shape: [[4,4],[4,4]], color: 4 },
+    { shape: [[0,5,5],[5,5,0]], color: 5 }, { shape: [[0,6,0],[6,6,6]], color: 6 },
+    { shape: [[7,7,0],[0,7,7]], color: 7 }
+];
+
+let board, score, highScore, isPaused, isGameOver, dropCounter, dropInterval, lastTime;
+let currentPiece, nextPiece, pieceColor, pieceRow, pieceCol;
+
+// Initialize High Score from LocalStorage
+highScore = localStorage.getItem('tetrisHighScore') || 0;
+document.getElementById('high-score-val').innerText = highScore;
+
+function resetGame() {
+    board = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+    score = 0;
+    isPaused = false;
+    isGameOver = false;
+    dropCounter = 0;
+    dropInterval = 1000;
+    lastTime = 0;
+    
+    document.getElementById("game-over-overlay").style.display = "none";
+    document.getElementById("pause-overlay").style.display = "none";
+    updateScore();
+    
+    nextPiece = pieces[Math.floor(Math.random() * pieces.length)];
+    spawnPiece();
+}
+
+function spawnPiece() {
+    const p = nextPiece;
+    currentPiece = p.shape;
+    pieceColor = p.color;
+    nextPiece = pieces[Math.floor(Math.random() * pieces.length)];
+    pieceRow = 0;
+    pieceCol = Math.floor(COLS / 2) - Math.floor(currentPiece[0].length / 2);
+    
+    if (collision(currentPiece, pieceRow, pieceCol)) {
+        endGame();
+    }
+    drawNext();
+}
+
+function endGame() {
+    isGameOver = true;
+    if (score > highScore) {
+        highScore = score;
+        localStorage.setItem('tetrisHighScore', highScore);
+        document.getElementById('high-score-val').innerText = highScore;
+    }
+    document.getElementById("game-over-overlay").style.display = "flex";
+}
+
+function collision(shape, r, c) {
+    for (let y = 0; y < shape.length; y++) {
+        for (let x = 0; x < shape[y].length; x++) {
+            if (shape[y][x]) {
+                let nY = r + y, nX = c + x;
+                if (nX < 0 || nX >= COLS || nY >= ROWS || (nY >= 0 && board[nY][nX])) return true;
+            }
+        }
+    }
+    return false;
+}
+
+function togglePause() {
+    if (isGameOver) return;
+    isPaused = !isPaused;
+    document.getElementById("pause-overlay").style.display = isPaused ? "flex" : "none";
+}
+
+function updateScore() { 
+    document.getElementById("score").innerText = score;
+}
+
+function drop() {
+    pieceRow++;
+    if (collision(currentPiece, pieceRow, pieceCol)) {
+        pieceRow--;
+        currentPiece.forEach((row, y) => row.forEach((v, x) => {
+            if (v) board[y + pieceRow][x + pieceCol] = pieceColor;
+        }));
+        
+        // Line clearing logic
+        for (let y = ROWS - 1; y >= 0; y--) {
+            if (board[y].every(v => v !== 0)) {
+                board.splice(y, 1);
+                board.unshift(Array(COLS).fill(0));
+                score += 10;
+                updateScore();
+                y++;
+            }
+        }
+        spawnPiece();
+    }
+}
+
+function draw() {
+    ctx.fillStyle = "#1a1a1a";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    board.forEach((row, y) => row.forEach((v, x) => {
+        if (v) {
+            ctx.fillStyle = colors[v];
+            ctx.fillRect(x * BLOCK, y * BLOCK, BLOCK - 1, BLOCK - 1);
+        }
+    }));
+    
+    if (currentPiece && !isPaused && !isGameOver) {
+        ctx.fillStyle = colors[pieceColor];
+        currentPiece.forEach((row, y) => row.forEach((v, x) => {
+            if (v) ctx.fillRect((pieceCol + x) * BLOCK, (pieceRow + y) * BLOCK, BLOCK - 1, BLOCK - 1);
+        }));
+    }
+}
+
+function drawNext() {
+    nextCtx.fillStyle = "#1a1a1a";
+    nextCtx.fillRect(0, 0, 80, 80);
+    nextPiece.shape.forEach((row, y) => row.forEach((v, x) => {
+        if (v) {
+            nextCtx.fillStyle = colors[nextPiece.color];
+            nextCtx.fillRect(x * 15 + 20, y * 15 + 20, 14, 14);
+        }
+    }));
+}
+
+function update(time = 0) {
+    if (!isPaused && !isGameOver) {
+        const dt = time - lastTime;
+        lastTime = time;
+        dropCounter += dt;
+        if (dropCounter > dropInterval) { drop(); dropCounter = 0; }
+        draw();
+    } else {
+        lastTime = time;
+    }
+    requestAnimationFrame(update);
+}
+
+document.addEventListener("keydown", e => {
+    if (isGameOver) return;
+    if (e.key.toLowerCase() === "p") return togglePause();
+    if (isPaused) return;
+    
+    if (e.key === "ArrowLeft" && !collision(currentPiece, pieceRow, pieceCol - 1)) pieceCol--;
+    if (e.key === "ArrowRight" && !collision(currentPiece, pieceRow, pieceCol + 1)) pieceCol++;
+    if (e.key === "ArrowDown") drop();
+    if (e.key === "ArrowUp") {
+        const r = currentPiece[0].map((_, i) => currentPiece.map(row => row[i]).reverse());
+        if (!collision(r, pieceRow, pieceCol)) currentPiece = r;
+    }
+    if (e.key === " ") { while (!collision(currentPiece, pieceRow + 1, pieceCol)) pieceRow++; drop(); }
+    draw();
+});
+
+resetGame();
+update();
+</script>
+</body>
+</html>
