@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Tic Tac Toe</title>
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    text-align: center;
+    background: #f4f4f4;
+}
+
+#board {
+    display: grid;
+    grid-template-columns: repeat(3, 100px);
+    grid-gap: 5px;
+    justify-content: center;
+    margin: 20px auto;
+}
+
+.cell {
+    width: 100px;
+    height: 100px;
+    font-size: 2.5rem;
+    background: white;
+    border: 2px solid #333;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cell:hover {
+    background: #ddd;
+}
+
+button, select {
+    padding: 8px 15px;
+    margin: 10px;
+    font-size: 1rem;
+}
+
+#status {
+    font-size: 1.2rem;
+    margin-top: 10px;
+}
+
+#scoreboard {
+    margin-top: 15px;
+    font-size: 1.1rem;
+}
+</style>
+</head>
+
+<body>
+
+<h1>Tic Tac Toe</h1>
+
+<select id="difficulty">
+    <option value="easy">Easy</option>
+    <option value="medium">Medium</option>
+    <option value="hard">Hard</option>
+</select>
+
+<button onclick="restart()">Restart Round</button>
+<button onclick="resetScore()">Reset Score</button>
+
+<div id="scoreboard">
+    Player: <span id="playerScore">0</span> |
+    Computer: <span id="computerScore">0</span> |
+    Draws: <span id="drawScore">0</span>
+</div>
+
+<div id="board"></div>
+<div id="status"></div>
+
+<script>
+const boardElement = document.getElementById("board");
+const statusText = document.getElementById("status");
+const difficultySelect = document.getElementById("difficulty");
+
+let board = ["","","","","","","","",""];
+let gameOver = false;
+
+// Score tracking
+let playerScore = 0;
+let computerScore = 0;
+let drawScore = 0;
+
+function createBoard() {
+    boardElement.innerHTML = "";
+    board.forEach((cell, index) => {
+        const div = document.createElement("div");
+        div.classList.add("cell");
+        div.innerText = cell;
+        div.addEventListener("click", () => playerMove(index));
+        boardElement.appendChild(div);
+    });
+}
+
+function playerMove(index) {
+    if (board[index] !== "" || gameOver) return;
+
+    board[index] = "X";
+    updateBoard();
+
+    if (checkWinner(board, "X")) {
+        playerScore++;
+        updateScore();
+        endGame("You win!");
+        return;
+    }
+
+    if (isDraw()) {
+        drawScore++;
+        updateScore();
+        endGame("Draw!");
+        return;
+    }
+
+    setTimeout(computerMove, 300);
+}
+
+function computerMove() {
+    let move;
+    const difficulty = difficultySelect.value;
+
+    if (difficulty === "easy") move = randomMove();
+    else if (difficulty === "medium") move = mediumMove();
+    else move = minimaxMove();
+
+    board[move] = "O";
+    updateBoard();
+
+    if (checkWinner(board, "O")) {
+        computerScore++;
+        updateScore();
+        endGame("Computer wins!");
+        return;
+    }
+
+    if (isDraw()) {
+        drawScore++;
+        updateScore();
+        endGame("Draw!");
+    }
+}
+
+function updateScore() {
+    document.getElementById("playerScore").innerText = playerScore;
+    document.getElementById("computerScore").innerText = computerScore;
+    document.getElementById("drawScore").innerText = drawScore;
+}
+
+function randomMove() {
+    const empty = board.map((v,i)=>v===""?i:null).filter(v=>v!==null);
+    return empty[Math.floor(Math.random()*empty.length)];
+}
+
+function mediumMove() {
+    for (let i=0;i<9;i++){
+        if(board[i]===""){
+            board[i]="O";
+            if(checkWinner(board,"O")) return i;
+            board[i]="";
+        }
+    }
+    for (let i=0;i<9;i++){
+        if(board[i]===""){
+            board[i]="X";
+            if(checkWinner(board,"X")) {
+                board[i]="";
+                return i;
+            }
+            board[i]="";
+        }
+    }
+    return randomMove();
+}
+
+function minimaxMove() {
+    let bestScore = -Infinity;
+    let move;
+
+    for (let i=0;i<9;i++){
+        if(board[i]===""){
+            board[i]="O";
+            let score = minimax(board,0,false);
+            board[i]="";
+            if(score > bestScore){
+                bestScore = score;
+                move = i;
+            }
+        }
+    }
+    return move;
+}
+
+function minimax(board, depth, isMaximizing) {
+    if (checkWinner(board, "O")) return 10 - depth;
+    if (checkWinner(board, "X")) return depth - 10;
+    if (board.every(cell => cell !== "")) return 0;
+
+    if (isMaximizing) {
+        let best = -Infinity;
+        for (let i=0;i<9;i++){
+            if(board[i]===""){
+                board[i]="O";
+                best = Math.max(best, minimax(board, depth+1, false));
+                board[i]="";
+            }
+        }
+        return best;
+    } else {
+        let best = Infinity;
+        for (let i=0;i<9;i++){
+            if(board[i]===""){
+                board[i]="X";
+                best = Math.min(best, minimax(board, depth+1, true));
+                board[i]="";
+            }
+        }
+        return best;
+    }
+}
+
+function checkWinner(b, player) {
+    const wins = [
+        [0,1,2],[3,4,5],[6,7,8],
+        [0,3,6],[1,4,7],[2,5,8],
+        [0,4,8],[2,4,6]
+    ];
+    return wins.some(comb => comb.every(index => b[index] === player));
+}
+
+function isDraw() {
+    return board.every(cell => cell !== "");
+}
+
+function updateBoard() {
+    createBoard();
+}
+
+function endGame(message) {
+    gameOver = true;
+    statusText.innerText = message;
+}
+
+function restart() {
+    board = ["","","","","","","","",""];
+    gameOver = false;
+    statusText.innerText = "";
+    createBoard();
+}
+
+function resetScore() {
+    playerScore = 0;
+    computerScore = 0;
+    drawScore = 0;
+    updateScore();
+    restart();
+}
+
+createBoard();
+</script>
+
+</body>
+</html>
