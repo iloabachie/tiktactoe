@@ -49,8 +49,13 @@ button, select {
 </select>
 
 <button onclick="restart()">Restart</button>
+<button id="pauseBtn">Pause</button>
 
 <canvas id="game" width="400" height="400"></canvas>
+
+<!-- Sound effects -->
+<audio id="eatSound" src="https://freesound.org/data/previews/341/341695_5260877-lq.mp3"></audio>
+<audio id="gameOverSound" src="https://freesound.org/data/previews/219/219912_4082826-lq.mp3"></audio>
 
 <script>
 const canvas = document.getElementById("game");
@@ -58,6 +63,10 @@ const ctx = canvas.getContext("2d");
 const scoreDisplay = document.getElementById("score");
 const highScoreDisplay = document.getElementById("highScore");
 const speedSelect = document.getElementById("speedSelect");
+const pauseBtn = document.getElementById("pauseBtn");
+
+const eatSound = document.getElementById("eatSound");
+const gameOverSound = document.getElementById("gameOverSound");
 
 const gridSize = 20;
 const tileCount = canvas.width / gridSize;
@@ -66,6 +75,7 @@ let snake, direction, nextDirection, food;
 let score, highScore;
 let gameInterval;
 let gameRunning = true;
+let paused = false;
 
 function init() {
     snake = [{ x: 10, y: 10 }];
@@ -73,12 +83,15 @@ function init() {
     nextDirection = { x: 0, y: 0 };
     score = 0;
     gameRunning = true;
+    paused = false;
 
     highScore = localStorage.getItem("snakeHighScore") || 0;
 
     spawnFood();
     updateScore();
     updateHighScore();
+
+    pauseBtn.innerText = "Pause";
 
     if (gameInterval) clearInterval(gameInterval);
     gameInterval = setInterval(gameLoop, speedSelect.value);
@@ -99,10 +112,9 @@ function spawnFood() {
 }
 
 function update() {
-    if (!gameRunning) return;
+    if (!gameRunning || paused) return;
 
     direction = nextDirection;
-
     if (direction.x === 0 && direction.y === 0) return;
 
     const head = {
@@ -111,10 +123,7 @@ function update() {
     };
 
     // Wall collision
-    if (
-        head.x < 0 || head.x >= tileCount ||
-        head.y < 0 || head.y >= tileCount
-    ) {
+    if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) {
         gameOver();
         return;
     }
@@ -129,6 +138,8 @@ function update() {
 
     if (head.x === food.x && head.y === food.y) {
         score++;
+        eatSound.currentTime = 0;
+        eatSound.play();
         spawnFood();
         updateScore();
     } else {
@@ -169,6 +180,8 @@ function gameLoop() {
 function gameOver() {
     gameRunning = false;
     clearInterval(gameInterval);
+    gameOverSound.currentTime = 0;
+    gameOverSound.play();
 
     if (score > highScore) {
         highScore = score;
@@ -179,26 +192,18 @@ function gameOver() {
     alert("Game Over! Final Score: " + score);
 }
 
-function updateScore() {
-    scoreDisplay.innerText = "Score: " + score;
-}
-
-function updateHighScore() {
-    highScoreDisplay.innerText = "High Score: " + highScore;
-}
+function updateScore() { scoreDisplay.innerText = "Score: " + score; }
+function updateHighScore() { highScoreDisplay.innerText = "High Score: " + highScore; }
 
 document.addEventListener("keydown", e => {
-    if (!gameRunning) return;
+    if (!gameRunning || paused) return;
 
     if ((e.key === "ArrowUp" || e.key === "w") && direction.y !== 1)
         nextDirection = { x: 0, y: -1 };
-
     if ((e.key === "ArrowDown" || e.key === "s") && direction.y !== -1)
         nextDirection = { x: 0, y: 1 };
-
     if ((e.key === "ArrowLeft" || e.key === "a") && direction.x !== 1)
         nextDirection = { x: -1, y: 0 };
-
     if ((e.key === "ArrowRight" || e.key === "d") && direction.x !== -1)
         nextDirection = { x: 1, y: 0 };
 });
@@ -210,9 +215,14 @@ speedSelect.addEventListener("change", () => {
     }
 });
 
-function restart() {
-    init();
-}
+pauseBtn.addEventListener("click", () => {
+    if (!gameRunning) return;
+
+    paused = !paused;
+    pauseBtn.innerText = paused ? "Resume" : "Pause";
+});
+
+function restart() { init(); }
 
 init();
 </script>
